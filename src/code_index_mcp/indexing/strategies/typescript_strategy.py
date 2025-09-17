@@ -25,7 +25,7 @@ class TypeScriptParsingStrategy(ParsingStrategy):
     def get_supported_extensions(self) -> List[str]:
         return ['.ts', '.tsx']
 
-    def parse_file(self, file_path: str, content: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
+    def parse_file(self, file_path: str, content: str, project_dir: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
         """Parse TypeScript file using tree-sitter with single-pass optimization."""
         symbols = {}
         functions = []
@@ -54,6 +54,7 @@ class TypeScriptParsingStrategy(ParsingStrategy):
         self._traverse_node_single_pass(tree.root_node, context)
 
         file_info = FileInfo(
+            file_path=file_path,
             language=self.get_language_name(),
             line_count=len(content.splitlines()),
             symbols={"functions": functions, "classes": classes},

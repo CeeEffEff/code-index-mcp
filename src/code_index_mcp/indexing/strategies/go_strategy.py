@@ -17,7 +17,7 @@ class GoParsingStrategy(ParsingStrategy):
     def get_supported_extensions(self) -> List[str]:
         return ['.go']
 
-    def parse_file(self, file_path: str, content: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
+    def parse_file(self, file_path: str, content: str, project_dir: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
         """Parse Go file using regex patterns."""
         symbols = {}
         functions = []
@@ -97,6 +97,7 @@ class GoParsingStrategy(ParsingStrategy):
         self._analyze_go_calls(content, symbols, file_path)
 
         file_info = FileInfo(
+            file_path=file_path,
             language=self.get_language_name(),
             line_count=len(lines),
             symbols={"functions": functions, "classes": classes},

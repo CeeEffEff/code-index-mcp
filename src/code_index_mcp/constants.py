@@ -6,6 +6,7 @@ Shared constants for the Code Index MCP server.
 SETTINGS_DIR = "code_indexer"
 CONFIG_FILE = "config.json"
 INDEX_FILE = "index.json"  # JSON index file
+NEO4J_CONFIG_FILE = "neo4j_config.json"  # Neo4j configuration file
 
 # Supported file extensions for code analysis
 # This is the authoritative list used by both old and new indexing systems
@@ -95,7 +96,7 @@ FILTER_CONFIG = {
         'coverage', 'htmlcov',
         
         # OS artifacts
-        '.DS_Store', 'Thumbs.db', 'desktop.ini'
+        '.DS_Store', 'Thumbs.db', 'desktop.ini',
     },
     
     "exclude_files": {
@@ -114,4 +115,3 @@ FILTER_CONFIG = {
     
     "supported_extensions": SUPPORTED_EXTENSIONS
 }
-

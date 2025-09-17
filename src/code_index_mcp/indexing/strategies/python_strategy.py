@@ -3,6 +3,9 @@ Python parsing strategy using AST - Optimized single-pass version.
 """
 
 import ast
+from collections import defaultdict
+from importlib.machinery import PathFinder
+import os
 import logging
 from typing import Dict, List, Tuple, Optional, Set
 from .base_strategy import ParsingStrategy
@@ -20,7 +23,7 @@ class PythonParsingStrategy(ParsingStrategy):
     def get_supported_extensions(self) -> List[str]:
         return ['.py', '.pyw']
     
-    def parse_file(self, file_path: str, content: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
+    def parse_file(self, file_path: str, content: str, project_dir: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
         """Parse Python file using AST with single-pass optimization."""
         symbols = {}
         functions = []
@@ -38,12 +41,16 @@ class PythonParsingStrategy(ParsingStrategy):
             logger.warning(f"Error parsing Python file {file_path}: {e}")
         
         file_info = FileInfo(
+            file_path=file_path,
             language=self.get_language_name(),
             line_count=len(content.splitlines()),
             symbols={"functions": functions, "classes": classes},
             imports=imports
         )
-        
+        try:
+            self._analyze_import_calls(tree, symbols, file_info, project_dir)
+        except Exception as e:
+            logger.warning(f"Error epanding import calls for Python file {file_path}: {e}", exc_info=True)
         return symbols, file_info
 
 
@@ -262,3 +269,181 @@ class SinglePassVisitor(ast.NodeVisitor):
         
         signature = f"def {node.name}({', '.join(args)}):"
         return signature
+
+    def _analyze_calls(self, tree: ast.AST, symbols: Dict[str, SymbolInfo], file_path: str):
+        """Analyze function calls and build caller-callee relationships."""
+        visitor = CallAnalysisVisitor(symbols, file_path)
+        visitor.visit(tree)
+
+    def _analyze_import_calls(self, tree: ast.AST, symbols: Dict[str, SymbolInfo], file_info: FileInfo, project_dir: str):
+        """Analyze function calls and build caller-callee relationships."""
+        if file_info.import_specs:
+            visitor = ImportCallAnalysisVisitor(file_info, project_dir, symbols)
+            visitor.visit(tree)
+
+class ImportCallAnalysisVisitor(ast.NodeVisitor):
+    """AST visitor to analyze function calls and build caller-callee relationships."""
+    
+    def __init__(self, file_info: FileInfo, project_dir: str,  symbols: Dict[str, SymbolInfo]):
+        self.symbols = symbols
+        self.file_path = file_info.file_path
+        self.current_function_stack = []
+        self.current_class = None
+        self.file_info = file_info
+        self.project_dir = project_dir
+    
+    def visit_ClassDef(self, node: ast.ClassDef):
+        """Visit class definition and track context."""
+        # assert self.current_class is None
+        self.current_class = node.name
+        self.generic_visit(node)
+        self.current_class = None
+    
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        """Visit function definition and track context."""
+        # File path is already relative after our fix
+        relative_path = self.file_path
+        
+        # Handle methods within classes
+        if self.current_class:
+            function_id = f"{relative_path}::{self.current_class}.{node.name}"
+        else:
+            function_id = f"{relative_path}::{node.name}"
+            
+        self.current_function_stack.append(function_id)
+        
+        # Visit all child nodes within this function
+        self.generic_visit(node)
+        
+        # Pop the function from stack when done
+        self.current_function_stack.pop()
+
+    def visit_Call(self, node: ast.Call):
+        """Visit function call and record relationship."""
+        # new_symbols = defaultdict(lambda: list())
+        new_symbols = {}
+        try:
+            # Get the function name being called
+            called_function = None
+            
+            if isinstance(node.func, ast.Name):
+                # Direct function call: function_name()
+                called_function = node.func.id
+            elif isinstance(node.func, ast.Attribute):
+                # Method call: obj.method() or module.function()
+                called_function = node.func.attr
+                
+            if called_function and (function_imports := [v for k, v in self.file_info.import_specs.items() if k.endswith(called_function) and v.origin]):
+                # Look for the called function in our symbols and add relationship
+                # The symbol is actually from another module
+                # Duplicate it with an updated ID,=,
+                # Look for the called function in our symbols and add relationship
+                caller_function = self.current_function_stack[-1] if self.current_function_stack else "main"
+                # for import_spec in function_imports:
+                #     if not import_spec.origin:
+                #         continue
+                #     new_symbol = SymbolInfo(type="function" if "." not in called_function else "method",)
+                for symbol_id, symbol_info in self.symbols.items():
+                    if symbol_info.type in ["function", "method"]:
+                        # Extract just the function/method name from the symbol ID
+                        symbol_name = symbol_id.split("::")[-1]
+                        
+                        # Check for exact match or method name match (ClassName.method)
+                        if (symbol_name == called_function or 
+                            symbol_name.endswith(f".{called_function}")):
+                            # Add caller to the called function's called_by list
+                            # if caller_function not in symbol_info.called_by:
+                                # symbol_info.called_by.append(caller_function)
+                            for import_spec in function_imports:
+                                old_symbol = symbol_info
+                                
+                                old_symbol["file"] = import_spec.origin
+                                new_symbol_id = os.path.relpath(import_spec.origin, self.project_dir) + "::" + symbol_name
+                                new_symbols[new_symbol_id] = SymbolInfo(type=symbol_info.type, file=import_spec.origin, line=-1, called_by=symbol_info.called_by, signature=symbol_info.signature, docstring=symbol_info.docstring)
+                            break
+                if not new_symbols:
+                    for import_spec in function_imports:
+                        new_symbol_id = os.path.relpath(import_spec.origin, self.project_dir) + "::" + called_function
+                        new_symbols[new_symbol_id] = SymbolInfo(file=import_spec.origin, type="function" if "." not in called_function else "method", line=-1, called_by=[caller_function])
+        except Exception:
+            # Silently handle parsing errors for complex call patterns
+            pass
+        
+        for symbol_id, symbol_info in new_symbols.items():
+            if symbol_id not in self.symbols:
+                # logger.info(f"Adding resolved import: {symbol_id=}")
+                self.symbols[symbol_id] = symbol_info
+            
+        # Continue visiting child nodes
+        self.generic_visit(node)
+
+class CallAnalysisVisitor(ast.NodeVisitor):
+    """AST visitor to analyze function calls and build caller-callee relationships."""
+    
+    def __init__(self, symbols: Dict[str, SymbolInfo], file_path: str):
+        self.symbols = symbols
+        self.file_path = file_path
+        self.current_function_stack = []
+        self.current_class = None
+    
+    def visit_ClassDef(self, node: ast.ClassDef):
+        """Visit class definition and track context."""
+        self.current_class = node.name
+        self.generic_visit(node)
+        self.current_class = None
+    
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        """Visit function definition and track context."""
+        # File path is already relative after our fix
+        relative_path = self.file_path
+        
+        # Handle methods within classes
+        if self.current_class:
+            function_id = f"{relative_path}::{self.current_class}.{node.name}"
+        else:
+            function_id = f"{relative_path}::{node.name}"
+            
+        self.current_function_stack.append(function_id)
+        
+        # Visit all child nodes within this function
+        self.generic_visit(node)
+        
+        # Pop the function from stack when done
+        self.current_function_stack.pop()
+    
+    def visit_Call(self, node: ast.Call):
+        """Visit function call and record relationship."""
+        try:
+            # Get the function name being called
+            called_function = None
+            
+            if isinstance(node.func, ast.Name):
+                # Direct function call: function_name()
+                called_function = node.func.id
+            elif isinstance(node.func, ast.Attribute):
+                # Method call: obj.method() or module.function()
+                called_function = node.func.attr
+                
+            if called_function and self.current_function_stack:
+                # Get the current calling function
+                caller_function = self.current_function_stack[-1]
+                
+                # Look for the called function in our symbols and add relationship
+                for symbol_id, symbol_info in self.symbols.items():
+                    if symbol_info.type in ["function", "method"]:
+                        # Extract just the function/method name from the symbol ID
+                        symbol_name = symbol_id.split("::")[-1]
+                        
+                        # Check for exact match or method name match (ClassName.method)
+                        if (symbol_name == called_function or 
+                            symbol_name.endswith(f".{called_function}")):
+                            # Add caller to the called function's called_by list
+                            if caller_function not in symbol_info.called_by:
+                                symbol_info.called_by.append(caller_function)
+                            break
+        except Exception:
+            # Silently handle parsing errors for complex call patterns
+            pass
+            
+        # Continue visiting child nodes
+        self.generic_visit(node)

@@ -56,7 +56,7 @@ class CodeIntelligenceService(BaseService):
         logger.info(f"Index manager state - Project path: {index_manager.project_path}")
         logger.info(f"Index manager state - Has builder: {index_manager.index_builder is not None}")
         if index_manager.index_builder:
-            logger.info(f"Index manager state - Has index: {index_manager.index_builder.in_memory_index is not None}")
+            logger.info(f"Index manager state - Has in-memory index: {index_manager.index_builder.in_memory_index is not None}")
         
         # Get file summary from JSON index
         summary = index_manager.get_file_summary(file_path)

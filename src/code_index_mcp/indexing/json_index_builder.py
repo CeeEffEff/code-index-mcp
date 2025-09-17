@@ -96,7 +96,7 @@ class JSONIndexBuilder:
             is_specialized = ext in specialized_extensions
             
             # Parse file using strategy
-            symbols, file_info = strategy.parse_file(rel_path, content)
+            symbols, file_info = strategy.parse_file(rel_path, content, self.project_path)
             
             logger.debug(f"Parsed {rel_path}: {len(symbols)} symbols ({file_info.language})")
             

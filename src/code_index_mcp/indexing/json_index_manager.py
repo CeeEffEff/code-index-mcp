@@ -15,12 +15,13 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 from .json_index_builder import JSONIndexBuilder
+from .index_provider import IIndexManager
 from ..constants import SETTINGS_DIR, INDEX_FILE
 
 logger = logging.getLogger(__name__)
 
 
-class JSONIndexManager:
+class JSONIndexManager(IIndexManager):
     """Manages JSON-based code index lifecycle and storage."""
     
     def __init__(self):

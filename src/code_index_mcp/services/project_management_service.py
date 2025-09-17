@@ -113,8 +113,8 @@ class ProjectManagementService(BaseService):
         # Business step 2: Cleanup existing project state
         self._cleanup_existing_project()
 
-        # Business step 3: Initialize JSON index manager
-        index_result = self._initialize_json_index_manager(normalized_path)
+        # Business step 3: Initialize index manager
+        index_result = self._initialize_index_manager(normalized_path)
 
         # Business step 3.1: Store index manager in context for other services
         self.helper.update_index_manager(self._index_manager)
@@ -149,7 +149,7 @@ class ProjectManagementService(BaseService):
             # Clear any existing index state
             pass
 
-    def _initialize_json_index_manager(self, project_path: str) -> Dict[str, Any]:
+    def _initialize_index_manager(self, project_path: str) -> Dict[str, Any]:
         """
         Business logic to initialize JSON index manager.
 
@@ -176,6 +176,7 @@ class ProjectManagementService(BaseService):
 
         # Get stats
         stats = self._index_manager.get_index_stats()
+        logger.debug(stats)
         file_count = stats.get('indexed_files', 0)
 
         return {

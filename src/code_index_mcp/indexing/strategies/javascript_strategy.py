@@ -24,7 +24,7 @@ class JavaScriptParsingStrategy(ParsingStrategy):
     def get_supported_extensions(self) -> List[str]:
         return ['.js', '.jsx', '.mjs', '.cjs']
 
-    def parse_file(self, file_path: str, content: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
+    def parse_file(self, file_path: str, content: str, project_dir: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
         """Parse JavaScript file using tree-sitter."""
         symbols = {}
         functions = []
@@ -37,6 +37,7 @@ class JavaScriptParsingStrategy(ParsingStrategy):
         self._traverse_js_node(tree.root_node, content, file_path, symbols, functions, classes, imports, exports)
 
         file_info = FileInfo(
+            file_path=file_path,
             language=self.get_language_name(),
             line_count=len(content.splitlines()),
             symbols={"functions": functions, "classes": classes},

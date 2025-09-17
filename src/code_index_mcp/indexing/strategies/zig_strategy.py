@@ -25,7 +25,7 @@ class ZigParsingStrategy(ParsingStrategy):
     def get_supported_extensions(self) -> List[str]:
         return ['.zig', '.zon']
 
-    def parse_file(self, file_path: str, content: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
+    def parse_file(self, file_path: str, content: str, project_dir: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
         """Parse Zig file using tree-sitter."""
         return self._tree_sitter_parse(file_path, content)
 
@@ -44,6 +44,7 @@ class ZigParsingStrategy(ParsingStrategy):
         self._traverse_zig_node(tree.root_node, content, file_path, symbols, functions, classes, imports)
 
         file_info = FileInfo(
+            file_path=file_path,
             language=self.get_language_name(),
             line_count=len(content.splitlines()),
             symbols={"functions": functions, "classes": classes},
@@ -96,4 +97,3 @@ class ZigParsingStrategy(ParsingStrategy):
             if child.type == 'identifier':
                 return self._safe_extract_text(content, child.start_byte, child.end_byte)
         return None
-

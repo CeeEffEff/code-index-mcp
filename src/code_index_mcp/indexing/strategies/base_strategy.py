@@ -20,7 +20,7 @@ class ParsingStrategy(ABC):
         """Return list of file extensions this strategy supports."""
 
     @abstractmethod
-    def parse_file(self, file_path: str, content: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
+    def parse_file(self, file_path: str, content: str, project_dir: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
         """
         Parse file content and extract symbols.
 

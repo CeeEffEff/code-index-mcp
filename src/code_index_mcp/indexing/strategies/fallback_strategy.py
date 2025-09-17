@@ -20,12 +20,13 @@ class FallbackParsingStrategy(ParsingStrategy):
     def get_supported_extensions(self) -> List[str]:
         return []  # Fallback supports any extension
 
-    def parse_file(self, file_path: str, content: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
+    def parse_file(self, file_path: str, content: str, project_dir: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
         """Basic parsing: extract file information without symbol parsing."""
         symbols = {}
 
         # For document files, we can at least index their existence
         file_info = FileInfo(
+            file_path=file_path,
             language=self.language_name,
             line_count=len(content.splitlines()),
             symbols={"functions": [], "classes": []},
