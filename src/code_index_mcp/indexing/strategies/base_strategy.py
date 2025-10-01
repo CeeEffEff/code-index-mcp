@@ -4,7 +4,7 @@ Abstract base class for language parsing strategies.
 
 import os
 from abc import ABC, abstractmethod
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 from ..models import SymbolInfo, FileInfo
 
 
@@ -20,7 +20,7 @@ class ParsingStrategy(ABC):
         """Return list of file extensions this strategy supports."""
 
     @abstractmethod
-    def parse_file(self, file_path: str, content: str, project_dir: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
+    def parse_file(self, file_path: str, content: str, project_dir: str, venv_root: str = None) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
         """
         Parse file content and extract symbols.
 

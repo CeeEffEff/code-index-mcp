@@ -11,7 +11,7 @@ import os
 import tempfile
 import threading
 from typing import Dict, List, Optional, Any
-
+import fnmatch
 from neo4j import GraphDatabase, Driver
 
 from .neo4j_index_builder import Neo4jIndexBuilder
@@ -43,7 +43,7 @@ class Neo4jIndexProvider(IIndexProvider):
                 check_result = session.run("MATCH (c:Cluster) RETURN count(c) as count")
                 check_record = check_result.single()
                 if not check_record or check_record["count"] == 0:
-                    logger.warning("No clusters found in the database")
+                    logger.exception("No clusters found in the database")
                     return []
                 
                 # Get cluster statistics
@@ -86,7 +86,7 @@ class Neo4jIndexProvider(IIndexProvider):
                 )
                 check_record = check_result.single()
                 if not check_record or check_record["count"] == 0:
-                    logger.warning(f"Cluster {cluster_id} not found in the database")
+                    logger.error(f"Cluster {cluster_id} not found in the database")
                     return []
                 
                 # Get functions in the cluster
@@ -111,7 +111,7 @@ class Neo4jIndexProvider(IIndexProvider):
             logger.error(f"Error getting functions in cluster {cluster_id}: {e}")
             return []
     
-    def get_cross_file_calls(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_cross_file_calls(self, limit: int = 1000) -> List[Dict[str, Any]]:
         """
         Get cross-file function calls.
         
@@ -131,7 +131,7 @@ class Neo4jIndexProvider(IIndexProvider):
                 """)
                 check_record = check_result.single()
                 if not check_record or check_record["count"] == 0:
-                    logger.warning("No cross-file calls found in the database")
+                    logger.debug("No cross-file calls found in the database")
                     return []
                 
                 # Get cross-file calls
@@ -171,7 +171,7 @@ class Neo4jIndexProvider(IIndexProvider):
                 """)
                 check_record = check_result.single()
                 if not check_record or check_record["count"] == 0:
-                    logger.warning("No cross-file calls found in the database")
+                    logger.debug("No cross-file calls found in the database")
                     return {"outgoing": [], "incoming": []}
                 
                 # Get functions with most outgoing cross-file calls
@@ -356,10 +356,7 @@ class Neo4jIndexProvider(IIndexProvider):
         # Special case for common patterns
         if pattern == "*":
             return "^.*$"
-            
-        import fnmatch
-        import re
-        
+
         # Get the regex pattern from fnmatch.translate
         regex_pattern = fnmatch.translate(pattern)
         
@@ -512,6 +509,7 @@ class Neo4jIndexManager(IIndexManager):
         self.config_path: Optional[str] = None
         self._lock = threading.RLock()
         self.temp_dir = None
+        self.venv_path: Optional[str] = None
         logger.info("Initialized Neo4j Index Manager")
     
     def find_files(self, pattern: str = "*") -> List[str]:
@@ -596,7 +594,8 @@ class Neo4jIndexManager(IIndexManager):
                     "uri": self.neo4j_uri,
                     "user": self.neo4j_user,
                     "password": self.neo4j_password,
-                    "database": self.neo4j_database
+                    "database": self.neo4j_database,
+                    "config_path": self.config_path
                 }
                 
                 # Load Neo4j configuration from file or environment
@@ -639,7 +638,8 @@ class Neo4jIndexManager(IIndexManager):
                     self.neo4j_uri,
                     self.neo4j_user,
                     self.neo4j_password,
-                    self.neo4j_database
+                    self.neo4j_database,
+                    self.venv_path
                 )
                 
                 self.index_provider = Neo4jIndexProvider(self.driver, self.project_path)
@@ -651,47 +651,6 @@ class Neo4jIndexManager(IIndexManager):
             except Exception as e:
                 logger.error(f"Failed to initialize Neo4j Index Manager: {e}")
                 return False
-
-        # def init_config(self,
-        #                 neo4j_uri: Optional[str] = None,
-        #                 neo4j_user: Optional[str] = None,
-        #                 neo4j_password: Optional[str] = None,
-        #                 neo4j_database: str = "neo4j",
-        #                 driver: Optional[Driver] = None,
-        #                 index_builder: Optional[Neo4jIndexBuilder] = None,
-        #                 index_provider: Optional[Neo4jIndexProvider] = None,
-        #                 config_path: Optional[str] = None):
-        #     arg_config = {
-        #                 "uri": neo4j_uri,
-        #                 "user": neo4j_user,
-        #                 "password": neo4j_password,
-        #                 "database": neo4j_database
-        #             }
-                    
-        #             # Load Neo4j configuration from file or environment
-        #     self._load_neo4j_config()
-                    
-        #             # Restore explicitly set values (non-None values)
-        #     if uri is not None:
-        #         self.neo4j_uri = uri
-        #     if user is not None:
-        #         self.neo4j_user = user
-        #     if password is not None:
-        #         self.neo4j_password = password
-        #     if database is not None:
-        #         self.neo4j_database = database
-                    
-        #             # Ensure we have defaults for any values that are still None
-        #     if self.neo4j_uri is None:
-        #         self.neo4j_uri = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
-        #     if self.neo4j_user is None:
-        #         self.neo4j_user = os.environ.get("NEO4J_USER", "neo4j")
-        #     if self.neo4j_password is None:
-        #         self.neo4j_password = os.environ.get("NEO4J_PASSWORD", "password")
-        #     if self.neo4j_database is None:
-        #         self.neo4j_database = os.environ.get("NEO4J_DATABASE", "neo4j")
-        
-        #     if self.driver:
 
     def get_provider(self) -> Optional[IIndexProvider]:
         """Get the current active index provider."""
@@ -741,7 +700,8 @@ class Neo4jIndexManager(IIndexManager):
                 logger.info("Refreshing Neo4j index...")
                 return self.index_builder.build_index(
                     run_clustering=getattr(self, 'clustering_enabled', True),
-                    k=getattr(self, 'clustering_k', 5)
+                    k=getattr(self, 'clustering_k', 5),
+                    max_iterations=getattr(self, 'clustering_max_iterations', 50)
                 )
                 
             except Exception as e:
@@ -779,6 +739,7 @@ class Neo4jIndexManager(IIndexManager):
     def load_index(self) -> bool:
         """Load existing index from disk."""
         with self._lock:
+            # self.refresh_index()
             status = self.get_index_status()
             return status.get("status") == "available"
     
@@ -861,8 +822,8 @@ class Neo4jIndexManager(IIndexManager):
             except Exception as e:
                 logger.error(f"Error getting index stats: {e}")
                 return {"status": "error", "error": str(e)}
-    
-    def set_project_path(self, project_path: str) -> bool:
+
+    def set_project_path(self, project_path: str, init = True) -> bool:
         """Set the project path and initialize index storage."""
         with self._lock:
             try:
@@ -893,10 +854,37 @@ class Neo4jIndexManager(IIndexManager):
                 logger.info(f"Neo4j config path: {self.config_path}")
                 
                 # Auto-initialize after setting project path to match JSON implementation behavior
-                return self.initialize()
-                
+                return self.initialize() if init else True
             except Exception as e:
                 logger.error(f"Failed to set project path and initialize: {e}")
+                return False
+
+    def set_venv_path(self, venv_path: str, init = True) -> bool:
+        """Set the project path and initialize index storage."""
+        with self._lock:
+            try:
+                # Input validation
+                if not venv_path or not isinstance(venv_path, str):
+                    logger.error(f"Invalid venv_path: {venv_path}")
+                    return False
+                
+                venv_path = venv_path.strip()
+                if not venv_path:
+                    logger.error("venv_path cannot be empty")
+                    return False
+                
+                if not os.path.isdir(venv_path):
+                    logger.error(f"venv_path does not exist: {venv_path}")
+                    return False
+                
+                self.venv_path = venv_path
+                logger.info(f"Set venv_path: {venv_path}")
+
+                # Auto-initialize after setting project path to match JSON implementation behavior
+                return self.initialize() if init else True
+                
+            except Exception as e:
+                logger.error(f"Failed to set venv path and initialize: {e}")
                 return False
     
     def _load_neo4j_config(self):
@@ -908,6 +896,7 @@ class Neo4jIndexManager(IIndexManager):
         self.neo4j_user = os.environ.get("NEO4J_USER", "neo4j")
         self.neo4j_password = os.environ.get("NEO4J_PASSWORD", "password")
         self.neo4j_database = os.environ.get("NEO4J_DATABASE", "neo4j")
+        self.config_path = os.environ.get("NEO4J_IDX_CFG_PATH", self.config_path)
         
         # Default clustering configuration
         self.clustering_enabled = True

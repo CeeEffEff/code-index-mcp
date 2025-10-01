@@ -7,7 +7,7 @@ that need to determine which files and directories should be processed or exclud
 
 import fnmatch
 from pathlib import Path
-from typing import List, Optional, Set
+from typing import List, Optional
 
 from ..constants import FILTER_CONFIG
 

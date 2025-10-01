@@ -7,7 +7,6 @@ from typing import Dict, List, Tuple, Optional
 from .base_strategy import ParsingStrategy
 from ..models import SymbolInfo, FileInfo
 
-
 class GoParsingStrategy(ParsingStrategy):
     """Go-specific parsing strategy using regex patterns."""
 
@@ -17,7 +16,7 @@ class GoParsingStrategy(ParsingStrategy):
     def get_supported_extensions(self) -> List[str]:
         return ['.go']
 
-    def parse_file(self, file_path: str, content: str, project_dir: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
+    def parse_file(self, file_path: str, content: str, project_dir: str, venv_root: str = None,) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
         """Parse Go file using regex patterns."""
         symbols = {}
         functions = []

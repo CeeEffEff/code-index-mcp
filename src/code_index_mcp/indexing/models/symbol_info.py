@@ -5,7 +5,6 @@ SymbolInfo model for representing code symbols.
 from dataclasses import dataclass
 from typing import Optional, List
 
-
 @dataclass
 class SymbolInfo:
     """Information about a code symbol (function, class, method, etc.)."""

@@ -47,10 +47,11 @@ def setup_indexing_performance_logging():
     stderr_handler = logging.StreamHandler(sys.stderr)
     stderr_handler.setFormatter(formatter)
     # stderr_handler.setLevel(logging.ERROR)
-    stderr_handler.setLevel(logging.INFO)
+    stderr_handler.setLevel(logging.WARNING)
 
     root_logger.addHandler(stderr_handler)
     root_logger.setLevel(logging.DEBUG)
+    # root_logger.setLevel(logging.NOTSET)
 
 # Initialize logging (no file handlers)
 setup_indexing_performance_logging()
@@ -124,6 +125,8 @@ def get_project_structure() -> str:
 @handle_mcp_tool_errors(return_type='str')
 def set_project_path(path: str, ctx: Context) -> str:
     """Set the base project path for indexing."""
+    # if not path or not path.strip():
+    #     path = "/Users/conor.fehilly/Documents/repos/genai-eval"
     return ProjectManagementService(ctx).initialize_project(path)
 
 @mcp.tool()

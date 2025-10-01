@@ -25,7 +25,7 @@ class TypeScriptParsingStrategy(ParsingStrategy):
     def get_supported_extensions(self) -> List[str]:
         return ['.ts', '.tsx']
 
-    def parse_file(self, file_path: str, content: str, project_dir: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
+    def parse_file(self, file_path: str, content: str, project_dir: str, venv_root: str = None,) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
         """Parse TypeScript file using tree-sitter with single-pass optimization."""
         symbols = {}
         functions = []

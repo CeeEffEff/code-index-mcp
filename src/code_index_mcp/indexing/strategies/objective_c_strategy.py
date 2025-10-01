@@ -17,7 +17,7 @@ class ObjectiveCParsingStrategy(ParsingStrategy):
     def get_supported_extensions(self) -> List[str]:
         return ['.m', '.mm']
 
-    def parse_file(self, file_path: str, content: str, project_dir: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
+    def parse_file(self, file_path: str, content: str, project_dir: str, venv_root: str = None,) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
         """Parse Objective-C file using regex patterns."""
         symbols = {}
         functions = []

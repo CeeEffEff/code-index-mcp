@@ -25,7 +25,7 @@ class ZigParsingStrategy(ParsingStrategy):
     def get_supported_extensions(self) -> List[str]:
         return ['.zig', '.zon']
 
-    def parse_file(self, file_path: str, content: str, project_dir: str) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
+    def parse_file(self, file_path: str, content: str, project_dir: str, venv_root: str = None,) -> Tuple[Dict[str, SymbolInfo], FileInfo]:
         """Parse Zig file using tree-sitter."""
         return self._tree_sitter_parse(file_path, content)
 

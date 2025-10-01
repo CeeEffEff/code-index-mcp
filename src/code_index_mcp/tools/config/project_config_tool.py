@@ -112,6 +112,9 @@ class ProjectConfigTool:
         from ...indexing import get_index_manager
         index_manager = get_index_manager()
         
+        # if self._settings.base_path:
+        #     index_manager.set_project_path(self._settings.base_path)
+        
         # Set project path if available
         if self._settings.base_path:
             index_manager.set_project_path(self._settings.base_path)
@@ -198,7 +201,8 @@ class ProjectConfigTool:
             Error message if invalid, None if valid
         """
         if not path or not path.strip():
-            return "Project path cannot be empty"
+            path = "/Users/conor.fehilly/Documents/repos/genai-eval/src"
+            # return "Project path cannot be empty"
 
         try:
             norm_path = os.path.normpath(path)

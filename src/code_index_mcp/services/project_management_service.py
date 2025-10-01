@@ -160,6 +160,7 @@ class ProjectManagementService(BaseService):
             Dictionary with initialization results
         """
         # Set project path in index manager
+        self._index_manager.set_venv_path("/Users/conor.fehilly/Documents/repos/genai-eval/.venv", init=False)
         if not self._index_manager.set_project_path(project_path):
             raise RuntimeError(f"Failed to set project path: {project_path}")
 

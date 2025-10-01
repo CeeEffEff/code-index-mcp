@@ -97,6 +97,8 @@ FILTER_CONFIG = {
         
         # OS artifacts
         '.DS_Store', 'Thumbs.db', 'desktop.ini',
+
+        '.orig',
     },
     
     "exclude_files": {
@@ -108,7 +110,10 @@ FILTER_CONFIG = {
         
         # Log files
         '*.log',
+
+        '*.ipynb',
         
+        "test*.py",
         # Lock files
         'package-lock.json', 'yarn.lock', 'Pipfile.lock'
     },

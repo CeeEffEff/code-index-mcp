@@ -1,0 +1,1 @@
+npx @modelcontextprotocol/inspector --config "/Users/conor.fehilly/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json" --server code-index-local
