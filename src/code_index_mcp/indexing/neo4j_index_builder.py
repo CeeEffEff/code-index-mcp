@@ -12,10 +12,13 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
+from mcp import ServerSession
+from mcp.server.fastmcp import Context
 from neo4j import GraphDatabase
 
 from .strategies import StrategyFactory
 from .models import SymbolInfo, FileInfo, ImportCallInfo
+from .utils.symbol_id_normalizer import SymbolIDNormalizer
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +35,7 @@ class Neo4jIndexMetadata:
     total_symbols: int = 0
     specialized_parsers: int = 0
     fallback_files: int = 0
+    venv: Optional[str] = None
 
 
 class Neo4jIndexBuilder:
@@ -53,7 +57,8 @@ class Neo4jIndexBuilder:
         neo4j_password: str,
         neo4j_database: str = "neo4j",
         additional_excludes: Optional[List[str]] = None,
-        venv_path: str = None
+        venv_path: str = None,
+        
     ):
         from ..utils import FileFilter
 
@@ -73,6 +78,13 @@ class Neo4jIndexBuilder:
         self.strategy_factory = StrategyFactory()
         self.file_filter = FileFilter(additional_excludes)
         self.in_memory_index = None
+        
+        # Initialize SymbolIDNormalizer for consistent cross-file symbol IDs
+        self.normalizer = SymbolIDNormalizer(
+            project_root=project_path,
+            venv_root=venv_path
+        )
+        self.normalizer = None
 
         # Neo4j connection
         self.neo4j_uri = neo4j_uri
@@ -146,7 +158,7 @@ class Neo4jIndexBuilder:
                         f"  - {record['s.qualified_name']} in {record['f.path']}"
                     )
 
-    def build_index(self, run_clustering=True, k=5, max_iterations=50) -> bool:
+    def build_index(self, run_clustering=True, k=5, max_iterations=50, ctx: Context[ServerSession, object] = None) -> bool:
         """
         Build the complete index using Strategy pattern and Neo4j.
 
@@ -179,7 +191,8 @@ class Neo4jIndexBuilder:
 
             # Traverse project files
             import_calls: Dict[str, Dict[str, ImportCallInfo]] = {}
-            for file_path in self._get_supported_files():
+            num_steps = len(files:=self._get_supported_files()) + (1 if run_clustering else 0)
+            for file_num, file_path in enumerate(files):
                 try:
                     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                         content = f.read()
@@ -200,9 +213,10 @@ class Neo4jIndexBuilder:
                     else:
                         fallback_count += 1
 
-                    # Parse file using strategy with relative path
+                    # Parse file using strategy with relative path and normalizer
                     symbols, file_info = strategy.parse_file(
-                        rel_path, content, self.project_path, self.venv_path
+                        rel_path, content, self.project_path, self.venv_path,
+                        # normalizer=self.normalizer
                     )
 
                     # Add file to Neo4j
@@ -215,6 +229,7 @@ class Neo4jIndexBuilder:
                     total_files += 1
 
                     if file_info.import_calls:
+                        num_steps += 1
                         import_calls[file_info.file_path] = file_info.import_calls
                     logger.debug(
                         f"Parsed {rel_path}: {len(symbols)} symbols ({file_info.language})"
@@ -222,13 +237,14 @@ class Neo4jIndexBuilder:
 
                 except Exception as e:
                     logger.exception(f"Error processing {file_path}: {e}")
+                # finally:
+                #     ctx.report_progress(file_num, num_steps)
 
             logger.info(f"Adding {len(import_calls)=}")
             logger.debug(f"{import_calls=}")
             parsed_modules = set()
             m, c, f = {},{},{}
-            for file_path, file_import_calls in import_calls.items():
-                
+            for import_file_num, (file_path, file_import_calls) in enumerate(import_calls.items()):
                 # Add all files
                 # Add all symbols
                 # Try to link
@@ -245,8 +261,8 @@ class Neo4jIndexBuilder:
                         import_call_info.import_spec._functions = f
                         import_call_info.import_spec._methods = m
                     import_call_info.called_symbol_info.type = import_call_info.import_spec.try_get_symbol_type(import_call_info.called_symbol_id) or "function"
-                    self._add_import_call_to_neo4j(import_call_info)
-
+                    self._add_import_call_to_neo4j(file_path, import_call_info)
+                # ctx.report_progress(file_num+import_file_num, num_steps)
             # Mark cross-file calls
             # self._mark_cross_file_calls()
 
@@ -269,10 +285,11 @@ class Neo4jIndexBuilder:
                 }
             else:
                 clustering_metadata = {}
-
+            # ctx.report_progress(num_steps, num_steps)
             # Store index metadata
             metadata = Neo4jIndexMetadata(
                 project_path=self.project_path,
+                venv=self.venv_path,
                 indexed_files=total_files,
                 index_version="1.0.0-neo4j",
                 timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -297,7 +314,7 @@ class Neo4jIndexBuilder:
             return True
 
         except Exception as e:
-            logger.error(f"Error building Neo4j index: {e}")
+            logger.exception(f"Error building Neo4j index: {e}")
             return False
 
     def _clear_existing_index(self):
@@ -404,7 +421,9 @@ class Neo4jIndexBuilder:
                     s.type = $type,
                     s.line = $line,
                     s.signature = $signature,
-                    s.docstring = $docstring
+                    s.docstring = $docstring,
+                    s.call_depths = $call_depths,
+                    s.decorator_list = $decorator_list
                 WITH s
                 MATCH (f:File {path: $path})
                 MERGE (f)-[:CONTAINS]->(s)
@@ -417,6 +436,8 @@ class Neo4jIndexBuilder:
                     "signature": symbol_info.signature,
                     "docstring": symbol_info.docstring,
                     "path": symbol_info.file,
+                    "call_depths": list(symbol_info.stack_levels),
+                    "decorator_list": symbol_info.decorator_list,
                 },
             )
 
@@ -449,10 +470,11 @@ class Neo4jIndexBuilder:
                 session.run(
                     """
                     MATCH (s:Symbol {qualified_name: $qualified_name})
-                    SET s:Function 
+                    SET s:Function
                     WITH s
                     MERGE (c:Class {qualified_name: $cid})
-                    MERGE (c)-[:CONTAINS]->(s)
+                    MERGE (c)-[:HAS_METHOD]->(s)
+                    MERGE (c)<-[:CLASS_TYPE]-(s)
                     """,
                     {"cid": class_id, "qualified_name": symbol_id},
                 )
@@ -507,8 +529,39 @@ class Neo4jIndexBuilder:
                 """,
                     {"called_id": symbol_id, "caller_id": caller_id},
                 )
+            for caller_id in symbol_info.decorator_list:
+                [caller_path, _] = caller_id.split("::") if "::" in caller_id else ["venv", caller_id]
+                session.run(
+                    """
+                        MERGE (f:File {path: $caller_path})
+                        ON CREATE
+                        SET f.language = $language
+                """,
+                    {
+                        "caller_path": caller_path,
+                        "language": file_info.language,
+                    },
+                )
+                session.run(
+                    """
+                    MATCH (caller:Symbol {qualified_name: $caller_id})
+                    SET caller:Decorater
+                """,
+                    {"caller_id": caller_id},
+                )
+                
+                session.run(
+                    """
+                    MATCH (called:Symbol {qualified_name: $called_id})
+                    MATCH (caller:Symbol {qualified_name: $caller_id})
+                    MATCH (f:File {path: $caller_path})
+                    MERGE (caller)-[:DECORATES]->(called)
+                    MERGE (f)-[:CONTAINS]->(caller)
+                """,
+                    {"called_id": symbol_id, "caller_id": caller_id, "caller_path": caller_path},
+                )
 
-    def _add_import_call_to_neo4j(self, import_call: ImportCallInfo):
+    def _add_import_call_to_neo4j(self, file_path: str, import_call: ImportCallInfo):
         
         logger.debug(f"Adding import call: {import_call.called_symbol_info.type}-{import_call.called_symbol_id} - {import_call.import_spec.spec}")
         
@@ -529,22 +582,33 @@ class Neo4jIndexBuilder:
                 """,
                     {"path": import_symbol_info.file},
                 )
+            session.run(  # The file where the import is happening
+                """
+                MERGE (f:File {path: $path})
+            """,
+                {"path": file_path},
+            )
             # Create or match the symbol node
             session.run(
                 """
                 MERGE (s:Symbol {qualified_name: $qualified_name})
                 ON CREATE SET s.name = $name,
-                    s.type = $type
+                    s.type = $type,
+                    s.call_depths = $call_depths,
+                    s.decorator_list = $decorator_list,
+                    s.imported_by_file_path = $imported_by_file_path
                 WITH s
                 MATCH (f:File {path: $path})
                 MERGE (f)-[:CONTAINS]->(s)
-                
             """,
                 {
                     "qualified_name": import_symbol_id,
                     "name": import_symbol_id.split("::")[-1],
                     "type": import_symbol_info.type,
                     "path": import_symbol_info.file,
+                    "call_depths": list(import_symbol_info.stack_levels),
+                    "decorator_list": import_symbol_info.decorator_list,
+                    "imported_by_file_path": file_path
                 },
             )
             if import_symbol_info.type == "class":
@@ -571,10 +635,11 @@ class Neo4jIndexBuilder:
                 session.run(
                     """
                     MATCH (s:Symbol {qualified_name: $qualified_name})
-                    SET s:Function 
+                    SET s:Function
                     WITH s
                     MERGE (c:Class {qualified_name: $cid})
-                    MERGE (c)-[:CONTAINS]->(s)
+                    MERGE (c)-[:HAS_METHOD]->(s)
+                    MERGE (c)<-[:CLASS_TYPE]-(s)
                     """,
                     {"cid": class_id, "qualified_name": import_symbol_id},
                 )
@@ -587,7 +652,6 @@ class Neo4jIndexBuilder:
                     {"path": import_symbol_info.file, "cid": class_id},
                 )
 
-
             for caller_id in import_symbol_info.called_by:
                 session.run(
                     """
@@ -597,7 +661,33 @@ class Neo4jIndexBuilder:
                 """,
                     {"called_id": import_call.called_symbol_id, "caller_id": caller_id},
                 )
-            # session.
+            for caller_id in import_symbol_info.decorator_list:
+                [caller_path, _] = caller_id.split("::") if "::" in caller_id else ["venv", caller_id]
+                session.run(
+                    """
+                        MERGE (f:File {path: $caller_path})
+                """,
+                    {
+                        "path": caller_path
+                    },
+                )
+                session.run(
+                    """
+                    MATCH (caller:Symbol {qualified_name: $caller_id})
+                    SET caller:Decorater
+                """,
+                    {"caller_id": caller_id},
+                )
+                session.run(
+                    """
+                    MATCH (called:Symbol {qualified_name: $called_id})
+                    MERGE (caller:Symbol {qualified_name: $caller_id})
+                    MATCH (f:File {path: $caller_path})
+                    MERGE (caller)-[:DECORATES]->(called)
+                    MERGE (f)-[:CONTAINS]->(caller)
+                """,
+                    {"called_id": import_call.called_symbol_id, "caller_id": caller_id, "caller_path": caller_path},
+                )
 
     def _store_index_metadata(self, metadata: Dict[str, Any]):
         """Store index metadata in Neo4j."""
@@ -846,7 +936,7 @@ class Neo4jIndexBuilder:
                 SET f.incoming_calls = 0
             """)
 
-            # Count arguments for each function
+            # Count arguments and docstring size for each function
             session.run("""
                 MATCH (f)
                 SET f.arg_count = CASE true
@@ -855,6 +945,10 @@ class Neo4jIndexBuilder:
                   WHEN f.signature CONTAINS "():" THEN 0
                   WHEN f.signature CONTAINS "," THEN size(split(f.signature, ","))
                   ELSE 1
+                END,
+                f.docstring_size = CASE f.docstring
+                    WHEN NULL THEN 0
+                    ELSE SIZE(f.docstring)
                 END
             """)
 
@@ -998,24 +1092,24 @@ class Neo4jIndexBuilder:
                 MERGE (stats:ClusterStatistics {id: 'cluster_stats'})
             """)
 
+                    #  avg(f.file_line_count) as avg_lines,
+                    #  avg(f.file_import_count) as avg_imports,
             # Compute cluster statistics
             result = session.run("""
                 MATCH (f:Function)
                 WHERE f.cluster IS NOT NULL
                 WITH f.cluster as cluster,
-                     avg(f.outgoing_calls) as avg_outgoing,
-                     avg(f.incoming_calls) as avg_incoming,
-                     avg(f.arg_count) as avg_args,
-                     avg(f.file_line_count) as avg_lines,
-                     avg(f.file_import_count) as avg_imports,
-                     count(*) as count
+                    avg(f.outgoing_calls) as avg_outgoing,
+                    avg(f.incoming_calls) as avg_incoming,
+                    avg(f.arg_count) as avg_args,
+                    avg(f.docstring_size) as avg_docstring_size,
+                    count(*) as count
                 MERGE (c:Cluster {id: cluster})
                 SET c.count = count,
                     c.avg_outgoing_calls = avg_outgoing,
                     c.avg_incoming_calls = avg_incoming,
                     c.avg_args = avg_args,
-                    c.avg_file_lines = avg_lines,
-                    c.avg_file_imports = avg_imports
+                    c.docstring_size = avg_docstring_size
                 WITH c as c
                 MATCH (stats:ClusterStatistics {id: 'cluster_stats'})
                 MERGE (stats)-[:HAS_CLUSTER]->(c)

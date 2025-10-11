@@ -20,6 +20,7 @@ class IndexMetadata:
     file_count: int
     project_root: str
     tool_version: str
+    venv_path: Optional[str] = None
 
 
 class IIndexProvider(Protocol):

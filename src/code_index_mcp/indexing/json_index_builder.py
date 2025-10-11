@@ -30,6 +30,7 @@ class IndexMetadata:
     total_symbols: int = 0
     specialized_parsers: int = 0
     fallback_files: int = 0
+    venv_path: Optional[str] = None
 
 
 class JSONIndexBuilder:

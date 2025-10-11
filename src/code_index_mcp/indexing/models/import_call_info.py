@@ -19,59 +19,58 @@ logger = logging.getLogger(__name__)
 
 class ModuleSpec:
 
-    def __init__(self, spec: _ModuleSpec, venv_root: str = None, project_root: str = None):
+    def __init__(self, spec: _ModuleSpec, venv_pkgs: str = None, project_root: str = None, try_inspect = False):
         self.spec = spec
         self.initialised = False
         self._classes = {}
         self._functions = {}
         self._methods = {}
-        self.venv_root = venv_root
-        self.python_path_before = os.environ['PYTHONPATH']
-        self.python_path = "/Users/conor.fehilly/Documents/repos/genai-eval/.venv/bin/python"
+        self.venv_pkgs = venv_pkgs
+        self.python_path_before = os.environ.get('PYTHONPATH', '')
+        self.python_path = self.python_path_before
         self.project_root = project_root
+        self.try_inspect = try_inspect
 
     def _getmembers(self):
-        try:
-            sys.path.insert(-1, self.venv_root or self.spec.origin)
-            os.environ['PYTHONPATH'] = self.python_path
-            self._module = module_from_spec(self.spec)
-            self.spec.loader.exec_module(self._module)  # Errors because module has dependencies different to this repo (of course). This repo inspects other repos, but has its own dependencies.
-            self._classes = {k: v for k, v in inspect.getmembers(self._module, inspect.isclass)}
-            self._functions = {k: v for k, v in inspect.getmembers(self._module, inspect.isfunction)}
-            self._methods = {f"{type(v.__self__).__name__}.{k}": v for k, v in inspect.getmembers(self._module, inspect.ismethod)}
-            self.initialised = True
-        except Exception as e:
-            logger.debug(f"Exception [{e}] when getting members for {self.spec.name} ({self.spec.origin}) :\n{self.classes}\n{self.functions}\n{self.methods}")
-        finally:
-            sys.path.pop(-1)
-            os.environ['PYTHONPATH'] = self.python_path_before
-        if self.initialised:
+        if self.try_inspect:
+            try:
+                # sys.path.insert(-1, self.venv_pkgs or self.spec.origin)
+                sys.path.insert(-1, self.venv_pkgs or self.spec.origin or self.project_root)
+                # sys.path.insert(-1, self.venv_pkgs or self.spec.origin or (self.spec.submodule_search_locations[0] if self.spec.submodule_search_locations else None)
+                os.environ['PYTHONPATH'] = self.python_path
+                self._module = module_from_spec(self.spec)
+                self.spec.loader.exec_module(self._module)  # Errors because module has dependencies different to this repo (of course). This repo inspects other repos, but has its own dependencies.
+                self._classes = {k: v for k, v in inspect.getmembers(self._module, inspect.isclass)}
+                self._functions = {k: v for k, v in inspect.getmembers(self._module, inspect.isfunction)}
+                self._methods = {f"{type(v.__self__).__name__}.{k}": v for k, v in inspect.getmembers(self._module, inspect.ismethod)}
+                self.initialised = True
+                return
+            except Exception as e:
+                logger.warning(f"Exception [{e}] when getting members for {self.spec.name} ({self.spec.origin}) :\n{list(self.classes.keys())[0:10]=}...\n{list(self.functions.keys())[0:10]=}...\n{list(self.methods.keys())[0:10]=}...\n")
+            finally:
+                sys.path.pop(-1)
+                os.environ['PYTHONPATH'] = self.python_path_before
+        if not self.spec.origin:
+            return
+        if "built-in" in self.spec.origin or "frozen" in self.spec.origin:
             return
         try:
             from ..strategies import python_strategy
             file_content = None
             with open(self.spec.origin) as mod_file:
                 file_content = mod_file.read()
-            module_symbols, module_file_info = python_strategy.PythonParsingStrategy().parse_file(self.spec.origin, file_content, self.spec.origin, self.venv_root, explore_imports=False)
+            module_symbols, module_file_info = python_strategy.PythonParsingStrategy().parse_file(self.spec.origin, file_content, self.spec.origin, self.venv_pkgs, explore_imports=False)
             logger.debug(f"{module_symbols=}")
             logger.debug(f"{module_file_info.symbols=}")
-            # self._classes = set(module_file_info.symbols["classes"])
             self._classes = {name: info for name, info in module_symbols.items() if info.type == "class"}
             self._functions = {name: info for name, info in module_symbols.items() if info.type == "function"}
             self._methods = {name: info for name, info in module_symbols.items() if info.type == "method"}
             self.initialised = True
         except Exception as e:
-            logger.debug(f"Exception [{e}] when getting members for {self.spec.name} ({self.spec.origin}) :\n{self.classes}\n{self.functions}\n{self.methods}")
-            
-        
-        # if not self.initialised:
-        #     try:
-        #         from ..strategies import python_strategy
-        #         file_content = None
-        #         with open(self.spec.origin) as mod_file:
-        #             file_content = mod_file.read()
-        #         python_strategy.ParsingStrategy().parse_file(self.spec.origin, self.spec.)
-        
+            if self.spec.origin and "built-in" not in self.spec.origin:
+                logger.warning(f"Exception [{e}] when getting members for {self.spec.name} ({self.spec.origin}) :\n{list(self.classes.keys())[0:10]=}...\n{list(self.functions.keys())[0:10]=}...\n{list(self.methods.keys())[0:10]=}...\n", exc_info=True)
+            self.initialised = False
+
 
     @property
     def classes(self):
@@ -103,7 +102,9 @@ class ModuleSpec:
                 symbol_path, symbol_part = symbol_id.split("::", 1)
                 # abs_id = os.path.abspath(symbol_path) + "::" + symbol_part
                 # abs_id = os.path.abspath(symbol_path).removeprefix(self.project_root) + "::" + symbol_part
-                abs_id = self.project_root + "/" + symbol_id
+                # abs_id = os.path.abspath(symbol_path) + "/" + symbol_id
+                # symbol_path is relative to project root
+                abs_id = os.path.abspath(os.path.join(self.project_root, symbol_path)) + "::" + symbol_part  # TODO still not sure on this
                 
             else:
                 symbol_part = symbol_id
@@ -121,10 +122,11 @@ class ModuleSpec:
             if symbol_part in self.methods or symbol_id in self.methods or abs_id in self.methods:
                 return "method"
         except ValueError:
-            pass
+            logger.debug("Not initialised?", exc_info=True)
+            return
         except Exception as e:
-            logger.debug(f"Exception when determining type of {symbol_id=} ({symbol_part=}): {e}")
-        logger.debug(f"Couldn't determine type of {symbol_id} ({symbol_part=}, {abs_id=}) from loaded symbols:\n{list(self.classes.keys())=}\n{list(self.functions.keys())=}\n{list(self.methods.keys())=}\n")
+            logger.exception(f"Exception when determining type of {symbol_id=} ({symbol_part=}): {e}", exc_info=True)
+        logger.debug(f"Couldn't determine type of {symbol_id} ({symbol_part=}, {abs_id=}) from loaded symbols:\n{list(self.classes.keys())[0:10]=}...\n{list(self.functions.keys())[0:10]=}...\n{list(self.methods.keys())[0:10]=}...\n")
         return None
 
 
@@ -138,7 +140,6 @@ class ImportCallInfo:
 
     @staticmethod
     def get_import_spec(import_fullname, path: str = None, project_root: str = None, import_module: str = None, venv_root: str = None) -> Optional[ModuleSpec]:
-        venv_root = "/Users/conor.fehilly/Documents/repos/genai-eval/.venv/lib/python3.13/site-packages"
         def _get_import_spec():
             spec = ImportCallInfo._get_spec(
                 project_root=project_root,
@@ -164,7 +165,6 @@ class ImportCallInfo:
                 project_root=project_root,
                 find_spec_function=find_spec,
                 import_fullname=import_fullname,
-                path=path,
                 venv_root=venv_root,
             )
             if spec:
@@ -175,45 +175,40 @@ class ImportCallInfo:
             return spec
         spec = _get_import_spec()
         return spec
-        # return ModuleSpec(spec=spec) if spec else None
 
     @staticmethod
-    def _get_spec(project_root: str, find_spec_function, import_fullname: str, path: Optional[str], venv_root: str = None) -> Optional[ModuleSpec]:
+    def _get_spec(project_root: str, find_spec_function, import_fullname: str, venv_root: str = None, *fn_args, **fn_kwargs) -> Optional[ModuleSpec]:
         """
         Abstracted method to get the import spec using the provided function.
         """
-        # Setup paths if project_root is provided
-        if project_root:
-            venv = ImportCallInfo._setup_paths(project_root, None, venv_root)
+        venv_pkgs = ImportCallInfo._setup_paths(project_root, venv_root)
         try:
-            spec = find_spec_function(import_fullname, path)
-        except Exception as e:
-            logger.info(e)
-            if project_root:
-                ImportCallInfo._cleanup_paths(project_root, venv)
-            return None
-        if not spec:
-            return None
-        try:
-            spec = ModuleSpec(spec=spec, venv_root = venv, project_root=project_root) 
+            _spec = find_spec_function(import_fullname, *fn_args, *fn_kwargs)
         except Exception as e:
             logger.debug(e, exc_info=True)
+            ImportCallInfo._cleanup_paths(project_root, venv_pkgs)
             return None
+        if not _spec:
+            return None
+        spec = None
+        try:
+            spec = ModuleSpec(spec=_spec, venv_pkgs=venv_pkgs, project_root=project_root)
+        except Exception as e:
+            logger.debug(e, exc_info=True)
         finally:
-            if project_root:
-                ImportCallInfo._cleanup_paths(project_root, venv)
+            ImportCallInfo._cleanup_paths(project_root, venv_pkgs)
         return spec
 
     @staticmethod
-    def _setup_paths(project_root: str, path: str = None, venv_root: str = None) -> Optional[str]:
+    def _setup_paths(project_root: str, venv_root: str = None) -> Optional[str]:
         """Sets up the paths for import operations."""
         sys.path.append(project_root)
-        venv = ImportCallInfo.get_venv_site_packages(project_root)  if not venv_root else venv_root
-        sys.path.append(venv)
+        venv_pkgs = ImportCallInfo.get_venv_site_packages(project_root, venv_root)
+        sys.path.append(venv_pkgs)
         # Optionally, set the path for the import operation
         # if path:
         #     os.environ['PYTHONPATH'] = path
-        return venv
+        return venv_pkgs
 
     @staticmethod
     def _cleanup_paths(*args):
@@ -223,10 +218,10 @@ class ImportCallInfo:
                 sys.path.remove(arg)
 
     @staticmethod
-    def get_venv_site_packages(project_root: Optional[str] = None):
+    def get_venv_site_packages(project_root: Optional[str] = None, venv_root: Optional[str] = None):
         # Determine the project root (assuming script is run from project root)
-        project_root = project_root  or os.getcwd()
-        venv_dir = os.path.join(project_root, ".venv")
+        project_root = project_root or os.getcwd()
+        venv_dir = venv_root or os.path.join(project_root, ".venv")
 
         # Read Python version from .python-version
         python_version = ""
@@ -248,7 +243,7 @@ class ImportCallInfo:
             site_packages = os.path.join(
                 venv_dir, "Scripts", "site-packages"
             )
-        logger.info(
+        logger.debug(
             f"{project_root=}\n"
             f"{venv_dir=}\n"
             f"{python_version_file=}\n"

@@ -23,12 +23,13 @@ class ProjectConfigTool:
         self._settings: Optional[ProjectSettings] = None
         self._project_path: Optional[str] = None
 
-    def initialize_settings(self, project_path: str) -> ProjectSettings:
+    def initialize_settings(self, project_path: str, venv:str=None) -> ProjectSettings:
         """
         Initialize project settings for the given path.
 
         Args:
             project_path: Absolute path to the project directory
+             venv:str=None
 
         Returns:
             ProjectSettings instance
@@ -43,7 +44,8 @@ class ProjectConfigTool:
             raise ValueError(f"Project path is not a directory: {project_path}")
 
         self._project_path = project_path
-        self._settings = ProjectSettings(project_path, skip_load=False)
+        self.venv = venv if venv and Path(venv).is_dir() else None
+        self._settings = ProjectSettings(project_path, venv, skip_load=False)
 
         return self._settings
 
@@ -201,8 +203,7 @@ class ProjectConfigTool:
             Error message if invalid, None if valid
         """
         if not path or not path.strip():
-            path = "/Users/conor.fehilly/Documents/repos/genai-eval/src"
-            # return "Project path cannot be empty"
+            return "Project path cannot be empty"
 
         try:
             norm_path = os.path.normpath(path)

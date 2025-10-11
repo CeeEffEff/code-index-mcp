@@ -43,6 +43,19 @@ class ContextHelper:
             return ""
 
     @property
+    def base_venv(self) -> str:
+        """
+        Get the base project path from the context.
+
+        Returns:
+            The base project path, or empty string if not set
+        """
+        try:
+            return self.ctx.request_context.lifespan_context.base_venv
+        except AttributeError:
+            return ""
+
+    @property
     def settings(self) -> Optional[ProjectSettings]:
         """
         Get the project settings from the context.
@@ -110,6 +123,34 @@ class ContextHelper:
 
         return None
 
+    def validate_base_venv(self) -> bool:
+        """
+        Check if the base venv is set and valid.
+
+        Returns:
+            True if base venv is set and exists, False otherwise
+        """
+        base_venv = self.base_venv
+        return (not base_venv) or os.path.exists(base_venv)
+
+    def get_base_venv_error(self) -> Optional[str]:
+        """
+        Get an error message if base venv is not properly set.
+
+        Returns:
+            Error message string if base venv is invalid, None if valid
+        """
+        if not self.base_venv:
+            return None
+
+        if not os.path.exists(self.base_venv):
+            return f"Project venv does not exist: {self.base_venv}"
+
+        if not os.path.isdir(self.base_venv):
+            return f"Project venv is not a directory: {self.base_venv}"
+
+        return None
+
     def update_file_count(self, count: int) -> None:
         """
         Update the file count in the context.
@@ -131,6 +172,18 @@ class ContextHelper:
         """
         try:
             self.ctx.request_context.lifespan_context.base_path = path
+        except AttributeError:
+            pass  # Context not available or doesn't support this operation
+
+    def update_base_venv(self, venv: str) -> None:
+        """
+        Update the base venv in the context.
+
+        Args:
+            venv: The new base venv
+        """
+        try:
+            self.ctx.request_context.lifespan_context.base_venv = venv
         except AttributeError:
             pass  # Context not available or doesn't support this operation
 

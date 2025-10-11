@@ -50,8 +50,8 @@ def setup_indexing_performance_logging():
     stderr_handler.setLevel(logging.WARNING)
 
     root_logger.addHandler(stderr_handler)
-    root_logger.setLevel(logging.DEBUG)
     # root_logger.setLevel(logging.NOTSET)
+    root_logger.setLevel(logging.DEBUG)
 
 # Initialize logging (no file handlers)
 setup_indexing_performance_logging()
@@ -70,9 +70,9 @@ async def indexer_lifespan(_server: FastMCP) -> AsyncIterator[CodeIndexerContext
     """Manage the lifecycle of the Code Indexer MCP server."""
     # Don't set a default path, user must explicitly set project path
     base_path = ""  # Empty string to indicate no path is set
-
+    venv = None
     # Initialize settings manager with skip_load=True to skip loading files
-    settings = ProjectSettings(base_path, skip_load=True)
+    settings = ProjectSettings(base_path, venv, skip_load=True)
 
     # Initialize context - file watcher will be initialized later when project path is set
     context = CodeIndexerContext(
@@ -123,11 +123,14 @@ def get_project_structure() -> str:
 
 @mcp.tool()
 @handle_mcp_tool_errors(return_type='str')
-def set_project_path(path: str, ctx: Context) -> str:
+def set_project_path(path: str, venv:Optional[str]=None, ctx: Context=None) -> str:
     """Set the base project path for indexing."""
+    path = "/Users/conor.fehilly/Documents/repos/dst-python-creative-intelligence/src/ai_analysis_service"
+    venv = "/Users/conor.fehilly/Library/Caches/pypoetry/virtualenvs/dst-python-creative-intelligence-bey-mJrN-py3.12"
     # if not path or not path.strip():
     #     path = "/Users/conor.fehilly/Documents/repos/genai-eval"
-    return ProjectManagementService(ctx).initialize_project(path)
+    ctx = mcp.get_context()
+    return ProjectManagementService(ctx).initialize_project(path, venv)
 
 @mcp.tool()
 @handle_mcp_tool_errors(return_type='dict')

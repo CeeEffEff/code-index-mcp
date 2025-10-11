@@ -27,6 +27,7 @@ class ProjectInitializationResult:
     search_capabilities: str
     monitoring_status: str
     message: str
+    venv: str = None
 
 
 class ProjectManagementService(BaseService):
@@ -53,7 +54,7 @@ class ProjectManagementService(BaseService):
     def _noop_operation(self, *_args, **_kwargs):
         yield
 
-    def initialize_project(self, path: str) -> str:
+    def initialize_project(self, path: str, venv:str=None) -> str:
         """
         Initialize a project with comprehensive business logic.
 
@@ -63,6 +64,7 @@ class ProjectManagementService(BaseService):
 
         Args:
             path: Project directory path to initialize
+            venv: venv dir
 
         Returns:
             Success message with project information
@@ -71,50 +73,55 @@ class ProjectManagementService(BaseService):
             ValueError: If path is invalid or initialization fails
         """
         # Business validation
-        self._validate_initialization_request(path)
+        self._validate_initialization_request(path, venv=venv)
 
         # Business workflow: Execute initialization
-        result = self._execute_initialization_workflow(path)
+        result = self._execute_initialization_workflow(path, venv=venv)
 
         # Business result formatting
         return self._format_initialization_result(result)
 
-    def _validate_initialization_request(self, path: str) -> None:
+    def _validate_initialization_request(self, path: str, venv:str=None) -> None:
         """
         Validate the project initialization request according to business rules.
 
         Args:
             path: Project path to validate
+            venv:str=None
 
         Raises:
             ValueError: If validation fails
         """
         # Business rule: Path must be valid
         error = self._config_tool.validate_project_path(path)
+        if not error and venv:
+            error = self._config_tool.validate_project_path(venv)
         if error:
             raise ValueError(error)
 
-    def _execute_initialization_workflow(self, path: str) -> ProjectInitializationResult:
+    def _execute_initialization_workflow(self, path: str, venv:str=None) -> ProjectInitializationResult:
         """
         Execute the core project initialization business workflow.
 
         Args:
             path: Project path to initialize
+            venv:str=
 
         Returns:
             ProjectInitializationResult with initialization data
         """
         # Business step 1: Initialize config tool
-        self._config_tool.initialize_settings(path)
+        self._config_tool.initialize_settings(path, venv)
         
         # Normalize path for consistent processing
         normalized_path = self._config_tool.normalize_project_path(path)
-
+        normalized_venv = self._config_tool.normalize_project_path(venv)
         # Business step 2: Cleanup existing project state
-        self._cleanup_existing_project()
+        if self.helper.base_path != normalized_path or self.helper.base_venv != normalized_venv:
+            self._cleanup_existing_project()
 
         # Business step 3: Initialize index manager
-        index_result = self._initialize_index_manager(normalized_path)
+        index_result = self._initialize_index_manager(normalized_path, normalized_venv)
 
         # Business step 3.1: Store index manager in context for other services
         self.helper.update_index_manager(self._index_manager)
@@ -130,6 +137,7 @@ class ProjectManagementService(BaseService):
 
         return ProjectInitializationResult(
             project_path=normalized_path,
+            venv=venv,
             file_count=index_result['file_count'],
             index_source=index_result['source'],
             search_capabilities=search_info,
@@ -149,7 +157,7 @@ class ProjectManagementService(BaseService):
             # Clear any existing index state
             pass
 
-    def _initialize_index_manager(self, project_path: str) -> Dict[str, Any]:
+    def _initialize_index_manager(self, project_path: str, venv: str = None) -> Dict[str, Any]:
         """
         Business logic to initialize JSON index manager.
 
@@ -160,17 +168,22 @@ class ProjectManagementService(BaseService):
             Dictionary with initialization results
         """
         # Set project path in index manager
-        self._index_manager.set_venv_path("/Users/conor.fehilly/Documents/repos/genai-eval/.venv", init=False)
+        # self._index_manager.set_venv_path("/Users/conor.fehilly/Documents/repos/genai-eval/.venv", init=False)
+        # "/Users/conor.fehilly/Library/Caches/pypoetry/virtualenvs/dst-python-creative-intelligence-bey-mJrN-py3.12"
+        if venv and not self._index_manager.set_venv_path(venv, init=False):
+            raise RuntimeError(f"Failed to set venv path: {project_path}")
         if not self._index_manager.set_project_path(project_path):
             raise RuntimeError(f"Failed to set project path: {project_path}")
 
         # Update context
         self.helper.update_base_path(project_path)
+        self.helper.update_base_venv(venv)
 
         # Try to load existing index or build new one
         if self._index_manager.load_index():
             source = "loaded_existing"
         else:
+            # ctx=self.ctx
             if not self._index_manager.build_index():
                 raise RuntimeError("Failed to build index")
             source = "built_new"
@@ -188,26 +201,26 @@ class ProjectManagementService(BaseService):
         }
 
 
-    def _is_valid_existing_index(self, index_data: Dict[str, Any]) -> bool:
-        """
-        Business rule to determine if existing index is valid and usable.
+    # def _is_valid_existing_index(self, index_data: Dict[str, Any]) -> bool:
+    #     """
+    #     Business rule to determine if existing index is valid and usable.
 
-        Args:
-            index_data: Index data to validate
+    #     Args:
+    #         index_data: Index data to validate
 
-        Returns:
-            True if index is valid and usable, False otherwise
-        """
-        if not index_data or not isinstance(index_data, dict):
-            return False
+    #     Returns:
+    #         True if index is valid and usable, False otherwise
+    #     """
+    #     if not index_data or not isinstance(index_data, dict):
+    #         return False
 
-        # Business rule: Must have new format metadata
-        if 'index_metadata' not in index_data:
-            return False
+    #     # Business rule: Must have new format metadata
+    #     if 'index_metadata' not in index_data:
+    #         return False
 
-        # Business rule: Must be compatible version
-        version = index_data.get('index_metadata', {}).get('version', '')
-        return version >= '3.0'
+    #     # Business rule: Must be compatible version
+    #     version = index_data.get('index_metadata', {}).get('version', '')
+    #     return version >= '3.0'
 
     def _load_existing_index(self, index_data: Dict[str, Any]) -> Dict[str, Any]:
         """

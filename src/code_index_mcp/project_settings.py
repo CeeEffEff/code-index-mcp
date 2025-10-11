@@ -54,14 +54,16 @@ def _get_available_strategies() -> list[SearchStrategy]:
 class ProjectSettings:
     """Class for managing project settings and index data"""
 
-    def __init__(self, base_path, skip_load=False):
+    def __init__(self, base_path, base_venv:str=None, skip_load=False):
         """Initialize project settings
 
         Args:
             base_path (str): Base path of the project
+            venv:str=None,
             skip_load (bool): Whether to skip loading files
         """
         self.base_path = base_path
+        self.base_venv = base_venv
         self.skip_load = skip_load
         self.available_strategies: list[SearchStrategy] = []
         self.refresh_available_strategies()

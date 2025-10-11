@@ -599,6 +599,7 @@ class Neo4jIndexManager(IIndexManager):
                 }
                 
                 # Load Neo4j configuration from file or environment
+                
                 self._load_neo4j_config()
                 
                 # Restore explicitly set values (non-None values)
@@ -639,7 +640,7 @@ class Neo4jIndexManager(IIndexManager):
                     self.neo4j_user,
                     self.neo4j_password,
                     self.neo4j_database,
-                    self.venv_path
+                    venv_path=self.venv_path
                 )
                 
                 self.index_provider = Neo4jIndexProvider(self.driver, self.project_path)
@@ -685,11 +686,11 @@ class Neo4jIndexManager(IIndexManager):
                 return False
 
 
-    def build_index(self, force_rebuild: bool = False) -> bool:
+    def build_index(self, ctx=None, force_rebuild: bool = False) -> bool:
         """Build or rebuild the index."""
-        return self.refresh_index()
+        return self.refresh_index(ctx=ctx)
 
-    def refresh_index(self) -> bool:
+    def refresh_index(self, ctx=None) -> bool:
         """Refresh the index (rebuild and reload)."""
         with self._lock:
             if not self.index_builder:
@@ -698,12 +699,15 @@ class Neo4jIndexManager(IIndexManager):
             
             try:
                 logger.info("Refreshing Neo4j index...")
-                return self.index_builder.build_index(
+                if self.index_builder.build_index(
                     run_clustering=getattr(self, 'clustering_enabled', True),
                     k=getattr(self, 'clustering_k', 5),
-                    max_iterations=getattr(self, 'clustering_max_iterations', 50)
-                )
-                
+                    max_iterations=getattr(self, 'clustering_max_iterations', 50),
+                    ctx=ctx
+                ):
+                    self.save_index()
+                    return True
+                return False
             except Exception as e:
                 logger.error(f"Failed to refresh index: {e}")
                 return False
@@ -778,6 +782,7 @@ class Neo4jIndexManager(IIndexManager):
                         "function_count": record["function_count"],
                         "cluster_count": record["cluster_count"],
                         "project_path": metadata.get("project_path", self.project_path),
+                        "venv_path": metadata.get("venv_path", self.venv_path),
                         "index_version": metadata.get("index_version", "unknown"),
                         "languages": metadata.get("languages", []),
                         "timestamp": metadata.get("timestamp", "unknown")
@@ -842,16 +847,7 @@ class Neo4jIndexManager(IIndexManager):
                     return False
                 
                 self.project_path = project_path
-                
-                # Create config directory
-                project_hash = hashlib.md5(project_path.encode()).hexdigest()[:12]
-                config_dir = os.path.join(tempfile.gettempdir(), SETTINGS_DIR, project_hash)
-                os.makedirs(config_dir, exist_ok=True)
-                
-                self.config_path = os.path.join(config_dir, NEO4J_CONFIG_FILE)
-                
                 logger.info(f"Set project path: {project_path}")
-                logger.info(f"Neo4j config path: {self.config_path}")
                 
                 # Auto-initialize after setting project path to match JSON implementation behavior
                 return self.initialize() if init else True
@@ -955,62 +951,62 @@ class Neo4jIndexManager(IIndexManager):
         except Exception as e:
             logger.error(f"Failed to save Neo4j configuration: {e}")
     
-    def set_neo4j_config(self, uri: str, user: str, password: str, database: str = "neo4j") -> bool:
-        """
-        Set Neo4j connection configuration.
+    # def set_neo4j_config(self, uri: str, user: str, password: str, database: str = "neo4j") -> bool:
+    #     """
+    #     Set Neo4j connection configuration.
         
-        Args:
-            uri: Neo4j URI (e.g., bolt://localhost:7687)
-            user: Neo4j username
-            password: Neo4j password
-            database: Neo4j database name
+    #     Args:
+    #         uri: Neo4j URI (e.g., bolt://localhost:7687)
+    #         user: Neo4j username
+    #         password: Neo4j password
+    #         database: Neo4j database name
             
-        Returns:
-            True if successful, False otherwise
-        """
-        with self._lock:
-            try:
-                self.neo4j_uri = uri
-                self.neo4j_user = user
-                self.neo4j_password = password
-                self.neo4j_database = database
+    #     Returns:
+    #         True if successful, False otherwise
+    #     """
+    #     with self._lock:
+    #         try:
+    #             self.neo4j_uri = uri
+    #             self.neo4j_user = user
+    #             self.neo4j_password = password
+    #             self.neo4j_database = database
                 
-                # Save configuration
-                self._save_neo4j_config()
+    #             # Save configuration
+    #             self._save_neo4j_config()
                 
-                # Close existing connection if any
-                if self.driver:
-                    self.driver.close()
-                    self.driver = None
-                    self.index_builder = None
-                    self.index_provider = None
+    #             # Close existing connection if any
+    #             if self.driver:
+    #                 self.driver.close()
+    #                 self.driver = None
+    #                 self.index_builder = None
+    #                 self.index_provider = None
                 
-                return True
+    #             return True
                 
-            except Exception as e:
-                logger.error(f"Failed to set Neo4j configuration: {e}")
-                return False
+    #         except Exception as e:
+    #             logger.error(f"Failed to set Neo4j configuration: {e}")
+    #             return False
     
-    def cleanup(self):
-        """Clean up resources."""
-        with self._lock:
-            self._cleanup()
+    # def cleanup(self):
+    #     """Clean up resources."""
+    #     with self._lock:
+    #         self._cleanup()
 
-    def _cleanup(self):
-        if self.driver:
-            self.driver.close()
+    # def _cleanup(self):
+    #     if self.driver:
+    #         self.driver.close()
             
-        self.project_path = None
-        self.neo4j_uri = None
-        self.neo4j_user = None
-        self.neo4j_password = None
-        self.neo4j_database = "neo4j"
-        self.driver = None
-        self.index_builder = None
-        self.index_provider = None
-        self.config_path = None
+    #     self.project_path = None
+    #     self.neo4j_uri = None
+    #     self.neo4j_user = None
+    #     self.neo4j_password = None
+    #     self.neo4j_database = "neo4j"
+    #     self.driver = None
+    #     self.index_builder = None
+    #     self.index_provider = None
+    #     self.config_path = None
             
-        logger.info("Cleaned up Neo4j Index Manager")
+    #     logger.info("Cleaned up Neo4j Index Manager")
 
 
 # Global instance
