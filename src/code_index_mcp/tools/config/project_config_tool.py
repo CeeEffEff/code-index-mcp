@@ -114,8 +114,8 @@ class ProjectConfigTool:
         from ...indexing import get_index_manager
         index_manager = get_index_manager()
         
-        # if self._settings.base_path:
-        #     index_manager.set_project_path(self._settings.base_path)
+        if self._settings.base_venv:
+            index_manager.set_venv_path(self._settings.base_venv, init=False)
         
         # Set project path if available
         if self._settings.base_path:

@@ -271,18 +271,7 @@ class Neo4jIndexBuilder:
 
             # After building the index, compute features and run clustering if requested
             if run_clustering:
-                logger.info("Computing features and running clustering...")
-                self._compute_features()
-                self._run_kmeans_clustering(max_iterations=max_iterations, k=k)
-
-                # Update metadata to include clustering information
-                clustering_metadata = {
-                    "clustering_k": k,
-                    "max_iterations": max_iterations,
-                    "clustering_timestamp": time.strftime(
-                        "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
-                    ),
-                }
+                clustering_metadata = self.run_kmeans_clustering(k, max_iterations)
             else:
                 clustering_metadata = {}
             # ctx.report_progress(num_steps, num_steps)
@@ -316,6 +305,21 @@ class Neo4jIndexBuilder:
         except Exception as e:
             logger.exception(f"Error building Neo4j index: {e}")
             return False
+
+    def run_kmeans_clustering(self, k, max_iterations, embedding_dimensions=20):
+        logger.info("Computing features and running clustering...")
+        self._compute_features(embedding_dimensions)
+        self._run_kmeans_clustering(max_iterations=max_iterations, k=k)
+
+        # Update metadata to include clustering information
+        return {
+            "clustering_k": k,
+            "max_iterations": max_iterations,
+            "embedding_dimensions": embedding_dimensions,
+            "clustering_timestamp": time.strftime(
+                "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
+            ),
+        }
 
     def _clear_existing_index(self):
         """Clear the existing Neo4j index."""
@@ -902,7 +906,7 @@ class Neo4jIndexBuilder:
             logger.error(f"Error getting symbol dependencies: {e}")
             return {"callers": [], "called": []}
 
-    def _compute_features(self):
+    def _compute_features(self, dimensions=20):
         """Compute numerical features nodes in the graph."""
         logger.info("Computing features for clustering...")
 
@@ -982,14 +986,15 @@ class Neo4jIndexBuilder:
             """)
 
             # Create embedding vector for clustering
-            session.run("""
+            session.run(f"""
                 CALL gds.fastRP.write('code-functions',
-                {
-                    embeddingDimension: 20,
+                {{
+                    embeddingDimension: {dimensions},
                     writeProperty: 'embedding'
-                    }
+                    }}
                 )
-            """)
+            """
+            )
             session.run("CALL gds.graph.drop('code-functions')")
             # session.run("""
             #     MATCH (f:Function)

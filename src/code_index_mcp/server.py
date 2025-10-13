@@ -19,6 +19,8 @@ from typing import AsyncIterator, Dict, Any, Optional, List
 from mcp import types
 from mcp.server.fastmcp import FastMCP, Context
 
+from code_index_mcp.indexing.neo4j_index_manager import Neo4jIndexManager
+
 # Local imports
 from .project_settings import ProjectSettings
 from .services import (
@@ -251,6 +253,23 @@ def refresh_index(ctx: Context) -> str:
         Success message with total file count
     """
     return IndexManagementService(ctx).rebuild_index()
+
+@mcp.tool()
+@handle_mcp_tool_errors(return_type='dict')
+def run_k_means_clustering(clustering_k: int, clustering_max_iterations: int, embedding_dimensions: int, ctx: Context) -> Dict[str, Any]:
+    """Run a k means clustering on the existing graph. This is unsupervised, so you may need to try different parameters and analyse the resulting clusters to see if they are insightful.
+
+    Args:
+        clustering_k (int): Number of clusters to optimise. 5 is a safe value, so scale from there if needed.
+        clustering_max_iterations (int): Number of iterations to optimise the clusters for. 50 is a safe value, so scale from their if needed.
+        embedding_dimensions (int): Number of dimensions of the embedding vector that will be computed for each node and used to determine similarity. Higher values increase runtime, may not converge, may overfit, may be more effective.
+
+    Returns:
+        Dict[str, Any]: Some clustering results or an error.
+    """
+    index_manager: Neo4jIndexManager = IndexManagementService(ctx)._index_manager
+    return index_manager.run_kmeans_clustering(clustering_k, clustering_max_iterations, embedding_dimensions)
+
 
 @mcp.tool()
 @handle_mcp_tool_errors(return_type='dict')

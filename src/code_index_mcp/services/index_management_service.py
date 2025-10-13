@@ -105,6 +105,8 @@ class IndexManagementService(BaseService):
         start_time = time.time()
 
         # Set project path in index manager
+        if self.settings.base_venv:
+            self._index_manager.set_venv_path(self.settings.base_venv, init=False)
         if not self._index_manager.set_project_path(self.base_path):
             raise RuntimeError("Failed to set project path in index manager")
 
