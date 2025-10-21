@@ -23,6 +23,7 @@ dependencies = [
     "pathspec>=0.12.1",
     "msgpack>=1.0.0",
     "neo4j>=5.28.2",
+    "multilspy>=0.0.15",
 ]
 
 [project.urls]

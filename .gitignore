@@ -76,8 +76,15 @@ node_modules/
 # Task files
 tasks.json
 tasks/ 
+.taskmaster
 
+# Cline
+.clinerules
 clinerules-bank
 clinerules-bank/*
-.clinerules
-.taskmaster
+
+# Continue
+.continue
+
+# Neo4j config
+neo4j_config.json
