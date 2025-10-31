@@ -1,0 +1,50 @@
+2025-09-11 21:36:07,119 - code_index_mcp.indexing.neo4j_index_manager - WARNING - Config path not set, cannot save Neo4j configuration
+2025-09-11 21:36:07,120 - code_index_mcp.indexing.neo4j_index_manager - INFO - Set project path: /Users/conor.fehilly/Documents/repos/genai-eval
+2025-09-11 21:36:07,120 - code_index_mcp.indexing.neo4j_index_manager - INFO - Neo4j config path: /var/folders/_1/7wqzqjts5299h6bw4202wjf00000gp/T/code_indexer/a1b17688c71b/neo4j_config.json
+2025-09-11 21:36:07,371 - code_index_mcp.indexing.neo4j_index_builder - INFO - Connected to Neo4j at bolt://localhost:7687
+2025-09-11 21:36:07,371 - code_index_mcp.indexing.neo4j_index_builder - INFO - Initialized Neo4j index builder for /Users/conor.fehilly/Documents/repos/genai-eval
+2025-09-11 21:36:07,372 - code_index_mcp.indexing.neo4j_index_builder - INFO - Available parsing strategies: 46 types
+2025-09-11 21:36:07,372 - code_index_mcp.indexing.neo4j_index_builder - INFO - Specialized parsers: 14 extensions, Fallback coverage: 96 extensions
+2025-09-11 21:36:07,372 - code_index_mcp.indexing.neo4j_index_manager - INFO - Initialized Neo4j Index Provider
+2025-09-11 21:36:07,372 - code_index_mcp.indexing.neo4j_index_manager - INFO - Initialized Neo4j Index Manager for /Users/conor.fehilly/Documents/repos/genai-eval
+2025-09-11 21:36:07,372 - code_index_mcp.indexing.test_neo4j_index - INFO - Building Neo4j index...
+2025-09-11 21:36:07,372 - code_index_mcp.indexing.neo4j_index_manager - INFO - Refreshing Neo4j index...
+2025-09-11 21:36:07,372 - code_index_mcp.indexing.neo4j_index_builder - INFO - Building Neo4j index using Strategy pattern...
+2025-09-11 21:36:07,390 - code_index_mcp.indexing.neo4j_index_builder - INFO - Cleared existing Neo4j index
+2025-09-11 21:36:07,392 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE CONSTRAINT file_path IF NOT EXISTS FOR (e:File) REQUIRE (e.path) IS UNIQUE` has no effect.} {description: `CONSTRAINT file_path FOR (e:File) REQUIRE (e.path) IS UNIQUE` already exists.} {position: None} for query: 'CREATE CONSTRAINT file_path IF NOT EXISTS FOR (f:File) REQUIRE f.path IS UNIQUE'
+2025-09-11 21:36:07,393 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE CONSTRAINT symbol_qualified_name IF NOT EXISTS FOR (e:Symbol) REQUIRE (e.qualified_name) IS UNIQUE` has no effect.} {description: `CONSTRAINT symbol_qualified_name FOR (e:Symbol) REQUIRE (e.qualified_name) IS UNIQUE` already exists.} {position: None} for query: 'CREATE CONSTRAINT symbol_qualified_name IF NOT EXISTS FOR (s:Symbol) REQUIRE s.qualified_name IS UNIQUE'
+2025-09-11 21:36:07,394 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE RANGE INDEX file_language IF NOT EXISTS FOR (e:File) ON (e.language)` has no effect.} {description: `RANGE INDEX file_language FOR (e:File) ON (e.language)` already exists.} {position: None} for query: 'CREATE INDEX file_language IF NOT EXISTS FOR (f:File) ON (f.language)'
+2025-09-11 21:36:07,394 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE RANGE INDEX symbol_name IF NOT EXISTS FOR (e:Symbol) ON (e.name)` has no effect.} {description: `RANGE INDEX symbol_name FOR (e:Symbol) ON (e.name)` already exists.} {position: None} for query: 'CREATE INDEX symbol_name IF NOT EXISTS FOR (s:Symbol) ON (s.name)'
+2025-09-11 21:36:07,395 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE FULLTEXT INDEX symbol_search IF NOT EXISTS FOR (e:Symbol) ON EACH [e.name, e.signature, e.docstring]` has no effect.} {description: `FULLTEXT INDEX symbol_search FOR (e:Symbol) ON EACH [e.name, e.signature, e.docstring]` already exists.} {position: None} for query: 'CREATE FULLTEXT INDEX symbol_search IF NOT EXISTS FOR (s:Symbol) ON EACH [s.name, s.signature, s.docstring]'
+2025-09-11 21:36:07,395 - code_index_mcp.indexing.neo4j_index_builder - INFO - Created Neo4j schema constraints and indexes
+2025-09-11 21:36:15,790 - code_index_mcp.indexing.neo4j_index_builder - INFO - Stored index metadata in Neo4j
+2025-09-11 21:36:15,790 - code_index_mcp.indexing.neo4j_index_builder - INFO - Built index with 378 symbols from 97 files in 8.42s
+2025-09-11 21:36:15,790 - code_index_mcp.indexing.neo4j_index_builder - INFO - Languages detected: ['json', 'markdown', 'python', 'shell', 'yaml']
+2025-09-11 21:36:15,790 - code_index_mcp.indexing.neo4j_index_builder - INFO - Strategy usage: 58 specialized, 39 fallback
+2025-09-11 21:36:15,790 - code_index_mcp.indexing.test_neo4j_index - INFO - Neo4j index built successfully
+2025-09-11 21:36:15,792 - code_index_mcp.indexing.test_neo4j_index - INFO - Neo4j index status: {'status': 'available', 'file_count': 97, 'symbol_count': 381, 'class_count': 54, 'function_count': 289, 'project_path': '/Users/conor.fehilly/Documents/repos/genai-eval', 'index_version': '1.0.0-neo4j', 'languages': ['json', 'markdown', 'python', 'shell', 'yaml'], 'timestamp': '2025-09-11T20:36:15Z'}
+2025-09-11 21:36:15,809 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: exports)} {position: line: 5, column: 30, offset: 211} for query: '\n                    MATCH (f:File)\n                    RETURN f.path as path, f.language as language, \n                           f.line_count as line_count, f.imports as imports, \n                           f.exports as exports\n                '
+2025-09-11 21:36:15,809 - code_index_mcp.indexing.test_neo4j_index - INFO - Found 97 files in Neo4j index
+2025-09-11 21:36:15,809 - code_index_mcp.indexing.test_neo4j_index - INFO - File 1: src/evaltask_model_migration (1).py (python, 1082 lines)
+2025-09-11 21:36:15,809 - code_index_mcp.indexing.test_neo4j_index - INFO - File 2: src/vertex_eval/evaluation_dataset.py (python, 47 lines)
+2025-09-11 21:36:15,809 - code_index_mcp.indexing.test_neo4j_index - INFO - File 3: src/vertex_eval/__init__.py (python, 2 lines)
+2025-09-11 21:36:15,809 - code_index_mcp.indexing.test_neo4j_index - INFO - File 4: src/vertex_eval/custom_answer_metric.py (python, 47 lines)
+2025-09-11 21:36:15,809 - code_index_mcp.indexing.test_neo4j_index - INFO - File 5: src/vertex_eval/MIGRATION_PLAN.md (markdown, 886 lines)
+2025-09-11 21:36:15,812 - code_index_mcp.indexing.test_neo4j_index - INFO - Found 23 symbols in file src/evaltask_model_migration (1).py
+2025-09-11 21:36:15,812 - code_index_mcp.indexing.test_neo4j_index - INFO - Symbol 1: function at line 629
+2025-09-11 21:36:15,812 - code_index_mcp.indexing.test_neo4j_index - INFO - Symbol 2: function at line 374
+2025-09-11 21:36:15,812 - code_index_mcp.indexing.test_neo4j_index - INFO - Symbol 3: function at line 627
+2025-09-11 21:36:15,812 - code_index_mcp.indexing.test_neo4j_index - INFO - Symbol 4: function at line 904
+2025-09-11 21:36:15,812 - code_index_mcp.indexing.test_neo4j_index - INFO - Symbol 5: function at line 625
+2025-09-11 21:36:15,812 - code_index_mcp.indexing.test_neo4j_index - INFO - Testing index factory...
+2025-09-11 21:36:15,812 - code_index_mcp.indexing.index_factory - INFO - Creating Neo4j index manager
+2025-09-11 21:36:15,813 - code_index_mcp.indexing.neo4j_index_manager - INFO - Set project path: /Users/conor.fehilly/Documents/repos/genai-eval
+2025-09-11 21:36:15,813 - code_index_mcp.indexing.neo4j_index_manager - INFO - Neo4j config path: /var/folders/_1/7wqzqjts5299h6bw4202wjf00000gp/T/code_indexer/a1b17688c71b/neo4j_config.json
+2025-09-11 21:36:15,824 - code_index_mcp.indexing.neo4j_index_builder - INFO - Connected to Neo4j at bolt://localhost:7687
+2025-09-11 21:36:15,824 - code_index_mcp.indexing.neo4j_index_builder - INFO - Initialized Neo4j index builder for /Users/conor.fehilly/Documents/repos/genai-eval
+2025-09-11 21:36:15,824 - code_index_mcp.indexing.neo4j_index_builder - INFO - Available parsing strategies: 46 types
+2025-09-11 21:36:15,824 - code_index_mcp.indexing.neo4j_index_builder - INFO - Specialized parsers: 14 extensions, Fallback coverage: 96 extensions
+2025-09-11 21:36:15,824 - code_index_mcp.indexing.neo4j_index_manager - INFO - Initialized Neo4j Index Provider
+2025-09-11 21:36:15,824 - code_index_mcp.indexing.neo4j_index_manager - INFO - Initialized Neo4j Index Manager for /Users/conor.fehilly/Documents/repos/genai-eval
+2025-09-11 21:36:15,827 - code_index_mcp.indexing.test_neo4j_index - INFO - Factory Neo4j index status: {'status': 'available', 'file_count': 97, 'symbol_count': 381, 'class_count': 54, 'function_count': 289, 'project_path': '/Users/conor.fehilly/Documents/repos/genai-eval', 'index_version': '1.0.0-neo4j', 'languages': ['json', 'markdown', 'python', 'shell', 'yaml'], 'timestamp': '2025-09-11T20:36:15Z'}
+2025-09-11 21:36:15,827 - code_index_mcp.indexing.test_neo4j_index - INFO - Neo4j index test completed successfully

@@ -1,0 +1,20 @@
+n
+"(:Class:Symbol {qualified_name: vertex_eval/evaluation_dataset.py::EvaluationDataset, line: 18, name: EvaluationDataset, type: class, arg_count: 0})"
+"(:Class {qualified_name: vertex_eval/evaluation_dataset.py::EvaluationDataset, arg_count: 0})"
+"(:Class {qualified_name: vertex_eval/evaluation_dataset.py::EvaluationDataset, arg_count: 0})"
+"(:Class {qualified_name: vertex_eval/evaluation_dataset.py::EvaluationDataset, arg_count: 0})"
+"(:Class:Symbol {qualified_name: vertex_eval/schemas.py::RestrictedBaseModel, docstring: Base model that doesn't allow extra fields on it.
+
+Args:
+    BaseModel (_type_): Inheritance from Pydantic., line: 8, name: RestrictedBaseModel, type: class, arg_count: 0})"
+"(:Class {qualified_name: vertex_eval/schemas.py::RestrictedBaseModel, arg_count: 0})"
+"(:Class:Symbol {qualified_name: vertex_eval/schemas.py::ClassNameMixin, line: 27, name: ClassNameMixin, type: class, arg_count: 0})"
+"(:Class {qualified_name: vertex_eval/schemas.py::ClassNameMixin, arg_count: 0})"
+"(:Class:Symbol {qualified_name: vertex_eval/schemas.py::JsonBaseModel, line: 33, name: JsonBaseModel, type: class, arg_count: 0})"
+"(:Class {qualified_name: vertex_eval/schemas.py::JsonBaseModel, arg_count: 0})"
+"(:Class {qualified_name: vertex_eval/schemas.py::JsonBaseModel, arg_count: 0})"
+"(:Class {qualified_name: vertex_eval/schemas.py::JsonBaseModel, arg_count: 0})"
+"(:Class:Symbol {qualified_name: vertex_eval/schemas.py::QuestionAndAnswerResponse, line: 71, name: QuestionAndAnswerResponse, type: class, arg_count: 0})"
+"(:Class:Symbol {qualified_name: vertex_eval/schemas.py::AiAnalysisResponse, line: 77, name: AiAnalysisResponse, type: class, arg_count: 0})"
+"(:Class:Symbol {qualified_name: vertex_eval/schemas.py::ReferenceQuestionAndAnswerResponse, line: 80, name: ReferenceQuestionAndAnswerResponse, type: class, arg_count: 0})"
+"(:Class:Symbol {qualified_name: vertex_eval/schemas.py::ReferenceAiAnalysisReponse, line: 86, name: ReferenceAiAnalysisReponse, type: class, arg_count: 0})"
